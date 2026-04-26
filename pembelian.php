@@ -7,20 +7,22 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Ambil data HEADER Pembelian, digabung dengan jumlah item yang dibeli
 $q = mysqli_query($conn, "
     SELECT 
         pb.id,
+        pb.no_faktur,
+        pb.tanggal,
         s.nama_supplier,
-        br.nama_barang,
-        br.harga_beli AS harga_barang,
-        pd.harga_beli,
-        pd.jumlah,
-        pd.subtotal,
-        pb.tanggal
+        pb.metode,
+        pb.status,
+        pb.total,
+        pb.sisa_hutang,
+        COUNT(pd.id) as jumlah_item
     FROM tb_pembelian pb
-    JOIN tb_supplier s ON pb.id_supplier = s.id
-    JOIN tb_detail_pembelian pd ON pb.id = pd.id_pembelian
-    JOIN tb_barang br ON pd.id_barang = br.id
+    LEFT JOIN tb_supplier s ON pb.id_supplier = s.id
+    LEFT JOIN tb_detail_pembelian pd ON pb.id = pd.id_pembelian
+    GROUP BY pb.id
     ORDER BY pb.id DESC
 ");
 
@@ -32,44 +34,29 @@ $q = mysqli_query($conn, "
 <link rel="stylesheet" href="inc/style.css">
 
 <style>
-body { margin:0; font-family:Arial; background:#f4f6f9; }
-.content { margin-left:240px; padding:30px; }
-.header { background:#fff; padding:15px; border-radius:8px; font-size:22px; font-weight:bold; margin-bottom:20px; }
-.card { background:#fff; padding:20px; border-radius:8px; }
-table { width:100%; border-collapse:collapse; margin-top:15px; }
-th, td { border:1px solid #ddd; padding:8px; text-align:center; }
-th { background:#f1f1f1; }
-.btn { padding:6px 12px; border-radius:5px; text-decoration:none; font-size:13px; }
-.btn-tambah { background:#007bff; color:#fff; }
-.btn-detail { background:#17a2b8; color:#fff; }
-.btn-edit {
-    background:#ffc107;
-    color:#000;
-    padding:6px 12px;
-    border-radius:4px;
-    text-decoration:none;
-    font-size:13px;
-    margin-right:4px;
-    display:inline-block;
-}
+.content { margin-left:250px; padding:20px; background:#eef1f5; min-height:100vh; }
+.card { background:#fff; border-radius:8px; padding:20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.header-title { font-size: 20px; font-weight: bold; color: #333; margin-bottom: 20px;}
 
-.btn-delete {
-    background:#dc3545;
-    color:#fff;
-    padding:6px 12px;
-    border-radius:4px;
-    text-decoration:none;
-    font-size:13px;
-    display:inline-block;
-}
+table { width:100%; border-collapse:collapse; margin-top:15px; background:#fff; }
+th, td { border-bottom:1px solid #eee; padding:12px 10px; text-align: left; font-size:13px; }
+th { background:#f8fafc; font-weight: 600; color: #475569; }
+td.center { text-align: center; }
+td.right { text-align: right; }
 
-.btn-edit:hover {
-    background:#e0a800;
-}
+.btn { padding:8px 15px; border-radius:5px; text-decoration:none; font-size:13px; font-weight: bold; display: inline-block;}
+.btn-tambah { background:#2563eb; color:#fff; margin-bottom: 15px; }
 
-.btn-delete:hover {
-    background:#c82333;
-}
+.btn-sm { padding:5px 10px; border-radius:4px; text-decoration:none; font-size:12px; color:#fff; display: inline-block;}
+.btn-edit { background:#f59e0b; color:#fff; margin-right:4px;}
+.btn-delete { background:#ef4444; color:#fff; }
+
+.badge-lunas { background-color: #d1fae5; color: #065f46; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+.badge-hutang { background-color: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+.badge-metode { background-color: #f1f5f9; color: #475569; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #cbd5e1; }
+
+.search-box { float:right; }
+.search-box input { padding:8px 12px; width:250px; border: 1px solid #ccc; border-radius: 5px; font-size: 13px;}
 </style>
 </head>
 
@@ -77,66 +64,80 @@ th { background:#f1f1f1; }
 <?php include "sidebar.php"; ?>
 
 <div class="content">
-<div class="header">DATA PEMBELIAN</div>
 
 <div class="card">
-<a href="pembelian_tambah.php" class="btn btn-tambah">+ Tambah Pembelian</a>
-<input 
-    type="text" 
-    id="searchInput" 
-    placeholder="Search"
-    style="float:right; padding:8px; width:250px; margin-bottom:10px;"
->
-<table id="tabelPembelian">
-<thead>
-<tr>
-    <th>ID</th>
-    <th>Nama Supplier</th>
-    <th>Nama Barang</th>
-    <th>Harga Barang</th>
-    <th>Harga Beli</th>
-    <th>Jumlah</th>
-    <th>Total Harga</th>
-    <th>Tanggal</th>
-    <th>Aksi</th>
-</tr>
-</thead>
-<tbody>
+    <div class="header-title">Riwayat Transaksi Pembelian</div>
+    
+    <div>
+        <a href="pembelian_tambah.php" class="btn btn-tambah">+ Buat Pembelian Baru</a>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Cari Faktur atau Supplier...">
+        </div>
+    </div>
 
-<?php $no = 1; ?>
-<?php while ($row = mysqli_fetch_assoc($q)) { ?>
-<tr>
-    <td><?= $no++ ?></td>
+    <table id="tabelPembelian">
+        <thead>
+            <tr>
+                <th>No. Faktur</th>
+                <th>Tanggal</th>
+                <th>Supplier</th>
+                <th class="center">Item</th>
+                <th>Metode</th>
+                <th class="right">Total Bayar</th>
+                <th class="center">Status</th>
+                <th class="center">Aksi</th>
+            </tr>
+        </thead>
+        <tbody>
 
-    <td><?= $row['nama_supplier'] ?></td>
-    <td><?= $row['nama_barang'] ?></td>
+        <?php 
+        if(mysqli_num_rows($q) > 0) {
+            while ($row = mysqli_fetch_assoc($q)) { 
+                
+                // Jika faktur kosong (transaksi lama), beri strip '-'
+                $faktur = !empty($row['no_faktur']) ? $row['no_faktur'] : '-';
+        ?>
+        <tr>
+            <td><strong><?= $faktur ?></strong></td>
+            <td><?= date('d M Y', strtotime($row['tanggal'])) ?></td>
+            <td><?= $row['nama_supplier'] ?? '<i style="color:#999">Tanpa Supplier</i>' ?></td>
+            
+            <td class="center"><?= $row['jumlah_item'] ?> jns</td>
+            
+            <td><span class="badge-metode"><?= strtoupper($row['metode']) ?></span></td>
+            
+            <td class="right"><strong>Rp <?= number_format($row['total'],0,',','.') ?></strong></td>
+            
+            <td class="center">
+                <?php if($row['status'] == 'lunas'): ?>
+                    <span class="badge-lunas">LUNAS</span>
+                <?php else: ?>
+                    <span class="badge-hutang">HUTANG (Sisa Rp<?= number_format($row['sisa_hutang'],0,',','.') ?>)</span>
+                <?php endif; ?>
+            </td>
 
-    <td>Rp <?= number_format($row['harga_barang'],0,',','.') ?></td>
-    <td>Rp <?= number_format($row['harga_beli'],0,',','.') ?></td>
+            <td class="center">
+                <a href="pembelian_edit.php?id=<?= $row['id'] ?>" class="btn-sm btn-edit">Lihat/Edit</a>
+                <a href="pembelian_hapus.php?id=<?= $row['id'] ?>" 
+                   onclick="return confirm('Hapus transaksi beserta detail barang ini? Stok barang juga akan ditarik kembali.')" 
+                   class="btn-sm btn-delete">
+                   Hapus
+                </a>
+            </td>
+        </tr>
+        <?php 
+            }
+        } else {
+            echo "<tr><td colspan='8' class='center'>Belum ada transaksi pembelian.</td></tr>";
+        }
+        ?>
 
-    <td><?= $row['jumlah'] ?></td>
-
-    <td>Rp <?= number_format($row['subtotal'],0,',','.') ?></td>
-
-    <td><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
-
-    <!-- AKSI TIDAK HILANG -->
-    <td>
-        <a href="pembelian_edit.php?id=<?= $row['id'] ?>" class="btn-edit">Edit</a>
-        <a href="pembelian_hapus.php?id=<?= $row['id'] ?>" 
-           onclick="return confirm('Yakin ingin menghapus data ini?')" 
-           class="btn-delete">
-           Hapus
-        </a>
-    </td>
-</tr>
-<?php } ?>
-
-
-</table>
+        </tbody>
+    </table>
 
 </div>
 </div>
+
 <script>
 document.getElementById("searchInput").addEventListener("keyup", function () {
     let filter = this.value.toLowerCase();

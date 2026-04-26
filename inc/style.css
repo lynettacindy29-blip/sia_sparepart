@@ -3,7 +3,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-    --primary: #4F46E5; /* Indigo */
+    --primary: #4F46E5;
+    /* Indigo */
     --primary-hover: #4338CA;
     --success: #10B981;
     --danger: #EF4444;
@@ -58,6 +59,7 @@ body {
     display: flex;
     align-items: center;
 }
+
 .sidebar-brand span {
     color: var(--primary);
 }
@@ -89,7 +91,8 @@ body {
     transition: transform 0.3s ease;
 }
 
-.sidebar-item:hover, .sidebar-item.active {
+.sidebar-item:hover,
+.sidebar-item.active {
     background: var(--sidebar-hover);
     color: #fff;
     border-left: 4px solid var(--primary);
@@ -242,4 +245,18 @@ body {
 .btn-primary:hover {
     background: var(--primary-hover);
     box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.4);
+}
+
+/* Tambahkan ini di file CSS-mu untuk menandai menu yang aktif */
+.submenu a.active {
+    background: #eef2ff;
+    color: #2563eb;
+    font-weight: bold;
+    border-left: 3px solid #2563eb;
+}
+
+.sidebar-item.active {
+    background: #eef2ff;
+    color: #2563eb;
+    border-left: 4px solid #2563eb;
 }

@@ -2,141 +2,82 @@
 session_start();
 include "config/db.php";
 
-// Cek login
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-if (isset($_POST['simpan'])) {
-
-    $tanggal     = $_POST['tanggal'];
-    $keterangan  = $_POST['keterangan'];
-    $id_akun     = $_POST['id_akun']; // akun beban
-    $jumlah      = $_POST['jumlah'];
-
-    // =============================
-    // 1️⃣ Simpan ke tabel pengeluaran
-    // =============================
-    mysqli_query($conn, "INSERT INTO tb_pengeluaran 
-        (tanggal, keterangan, jumlah) 
-        VALUES ('$tanggal','$keterangan','$jumlah')");
-
-    // =============================
-    // 2️⃣ Ambil akun Kas
-    // =============================
-    $kas = mysqli_query($conn, "SELECT id FROM tb_akun WHERE nama_akun='Kas' LIMIT 1");
-    $data_kas = mysqli_fetch_assoc($kas);
-    $akun_kas = $data_kas['id'];
-
-    // =============================
-    // 3️⃣ Insert Jurnal (Debit Beban)
-    // =============================
-    mysqli_query($conn, "INSERT INTO tb_jurnal 
-        (tanggal, keterangan, id_akun, debit, kredit) 
-        VALUES 
-        ('$tanggal','$keterangan',$id_akun,$jumlah,0)");
-
-    // =============================
-    // 4️⃣ Insert Jurnal (Kredit Kas)
-    // =============================
-    mysqli_query($conn, "INSERT INTO tb_jurnal 
-        (tanggal, keterangan, id_akun, debit, kredit) 
-        VALUES 
-        ('$tanggal','$keterangan',$akun_kas,0,$jumlah)");
-
-    header("Location: pengeluaran.php");
-    exit;
-}
-?>
+// PERBAIKAN: Mengambil data akun yang kategorinya 'Beban'
+// Menggunakan kolom 'kategori' sesuai yang sudah kita perbarui tadi
+$qAkun = mysqli_query($conn, "SELECT id, kode_akun, nama_akun FROM tb_akun WHERE kategori = 'Beban' ORDER BY kode_akun ASC");
+?> 
 
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Tambah Pengeluaran</title>
-    <link rel="stylesheet" href="inc/style.css">
-    <style>
-        .content {
-            margin-left: 250px;
-            padding: 30px;
-        }
-        .card {
-            background: #fff;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-            width: 500px;
-        }
-        .card h3 {
-            margin-bottom: 20px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
-        .btn {
-            background: #007bff;
-            color: #fff;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        .btn:hover {
-            background: #0056b3;
-        }
-    </style>
+<title>Tambah Pengeluaran</title> 
+<link rel="stylesheet" href="inc/style.css">
+<style>
+/* CSS Seragam untuk Form */
+.content { margin-left:250px; padding:20px; background:#eef1f5; min-height:100vh; }
+.card { background:#fff; border-radius:8px; padding:25px; width:500px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+h3 { margin-top: 0; margin-bottom: 5px; color: #333; }
+p.desc { font-size: 13px; color: #64748b; margin-bottom: 20px; }
+
+label { font-size:13px; margin-top:15px; display:block; font-weight: bold; color: #475569; }
+input, select { width:100%; padding:10px; margin-top:6px; border:1px solid #cbd5e1; border-radius:5px; font-size: 14px; box-sizing: border-box; }
+input:focus, select:focus { border-color: #2563eb; outline: none; }
+
+button[type="submit"] { margin-top:25px; width:100%; padding:12px; border:none; border-radius:6px; background:#2563eb; color:#fff; font-weight:bold; cursor:pointer; font-size: 14px; }
+button[type="submit"]:hover { background:#1d4ed8; }
+
+.btn-back { background:#64748b; color: white; display:block; text-align:center; padding:12px; border-radius:6px; text-decoration:none; margin-top:10px; font-weight: bold; font-size: 14px; }
+.btn-back:hover { background:#475569; }
+</style>
 </head>
+
 <body>
 
 <?php include "sidebar.php"; ?>
 
 <div class="content">
     <div class="card">
-        <h3>Tambah Pengeluaran</h3>
 
-        <form method="POST">
-            <div class="form-group">
-                <label>Tanggal</label>
-                <input type="date" name="tanggal" value="<?= date('Y-m-d') ?>" required>
-            </div>
+        <h3>Input Pengeluaran Kas</h3>
+        <p class="desc">Catat biaya operasional toko yang keluar hari ini.</p>
 
-            <div class="form-group">
-                <label>Keterangan</label>
-                <input type="text" name="keterangan" required>
-            </div>
+        <form method="POST" action="pengeluaran_simpan.php">
 
-            <div class="form-group">
-                <label>Pilih Akun Beban</label>
-                <select name="id_akun" required>
-                    <option value="">-- Pilih Akun Beban --</option>
-                    <?php
-                    $akun = mysqli_query($conn, "SELECT * FROM tb_akun WHERE tipe='beban'");
-                    while ($row = mysqli_fetch_assoc($akun)) {
-                        echo "<option value='".$row['id']."'>".$row['kode_akun']." - ".$row['nama_akun']."</option>";
+            <label>Tanggal Pengeluaran</label>
+            <input type="date" name="tanggal" value="<?= date('Y-m-d') ?>" required>
+
+            <label>Keterangan / Keperluan</label>
+            <input type="text" name="keterangan" placeholder="Contoh: Bayar Listrik Bulan Maret, Beli Galon..." required autofocus>
+
+            <label>Kategori Biaya (Akun Beban)</label>
+            <select name="id_akun" required>
+                <option value="">-- Pilih Akun Beban --</option>
+                <?php 
+                if ($qAkun && mysqli_num_rows($qAkun) > 0) {
+                    while($a = mysqli_fetch_assoc($qAkun)) { 
+                ?>
+                    <option value="<?= $a['id'] ?>"><?= $a['kode_akun'] ?> - <?= htmlspecialchars($a['nama_akun']) ?></option>
+                <?php 
                     }
-                    ?>
-                </select>
-            </div>
+                } else {
+                    echo "<option value=''>Belum ada akun Beban di Data Akun</option>";
+                }
+                ?>
+            </select>
 
-            <div class="form-group">
-                <label>Jumlah</label>
-                <input type="number" name="jumlah" required>
-            </div>
+            <label>Nominal Pengeluaran (Rp)</label>
+            <input type="number" name="nominal" placeholder="Contoh: 150000" min="1" required>
 
-            <button type="submit" name="simpan" class="btn">Simpan</button>
+            <button type="submit">Simpan Pengeluaran</button>
+            <a href="pengeluaran.php" class="btn-back">Batal & Kembali</a>
+
         </form>
+
     </div>
 </div>
 

@@ -4,7 +4,8 @@ include "config/db.php";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
-    $tanggal = date('Y-m-d');
+    // Tangkap tanggal dari form, jangan pakai date('Y-m-d')
+    $tanggal = $_POST['tanggal']; 
     $nama_pelanggan = $_POST['nama_pelanggan'];
     $metode = $_POST['metode_pembayaran'];
 
